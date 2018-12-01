@@ -1,1 +1,4 @@
 puzzle_input*
+.idea/*
+!.idea/runConfigurations
+venv
