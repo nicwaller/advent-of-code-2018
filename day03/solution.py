@@ -1,77 +1,36 @@
+import re
+from itertools import chain, product
+
+matrix = [[0 for x in range(1024)] for y in range(1024)]
+input_rows = []
+
+
 def part1():
-    wt = 1024
-    ht = 1024
-    matrix = [[0 for x in range(wt)] for y in range(ht)]
-    # print(matrix)
-    with open('puzzle_input') as f:
-        lines = f.read().splitlines()
-        for line in lines:
-            parts = line.split()
-            claim = parts[0]
-            coords = parts[2].strip(':').split(',')
-            size = parts[3].split('x')
-            x = int(coords[0])
-            y = int(coords[1])
-            w = int(size[0])
-            h = int(size[1])
-            # print(x, y, w, h)
+    for (patch_id, x, y, w, h) in input_rows:
+        for (x1, y1) in product(range(x, x+w), range(y, y+h)):
+            matrix[x1][y1] += 1
 
-            for ix in range(x,x+w):
-                for iy in range(y,y+h):
-                    matrix[iy][ix] += 1
-
-        pass
-
-    for y in range(h):
-        # print(matrix[y])
-        pass
-
-    # part 2
-    with open('puzzle_input') as f:
-        lines = f.read().splitlines()
-        for line in lines:
-            parts = line.split()
-            claim = parts[0]
-            coords = parts[2].strip(':').split(',')
-            size = parts[3].split('x')
-            x = int(coords[0])
-            y = int(coords[1])
-            w = int(size[0])
-            h = int(size[1])
-            # print(x, y, w, h)
-
-            broken = False
-            for ix in range(x,x+w):
-                for iy in range(y,y+h):
-                    if matrix[iy][ix] > 1:
-                        broken = True
-                        continue
-                if broken:
-                    continue
-
-            if not broken:
-                print(line)
+    return sum([1 for z in chain.from_iterable(zip(*matrix)) if z > 1])
 
 
+def patch_is_unique(row):
+    (patch_id, x, y, w, h) = row
+    for (x1, y1) in product(range(x, x + w), range(y, y + h)):
+        if matrix[x1][y1] > 1:
+            return False
+    return True
 
-    count = 0
-    for y in range(ht):
-        for x in range(wt):
-            if matrix[y][x] >= 2:
-                count += 1
-        # print(matrix[y])
-        pass
-    return str(count)
 
 def part2():
-    with open('puzzle_input') as f:
-        pass
-    return ""
+    return next(row for row in input_rows if patch_is_unique(row))[0]
 
 
 def main():
-    print('Part 1: ' + part1())
-    print('Part 2: ' + part2())
+    with open('puzzle_input') as f:
+        for line in f:
+            input_rows.append([int(x) for x in re.sub(r'[^0-9]', ' ', line).split()])
+    print('Part 1: ' + str(part1()))
+    print('Part 2: ' + str(part2()))
 
 
 if __name__ == '__main__':
