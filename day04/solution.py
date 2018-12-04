@@ -24,9 +24,29 @@ def part1(input_rows):
 
 
 def part2(input_rows):
-    for row in input_rows:
-        pass
-    return ''
+    guard_sleep_periods = dict()
+
+    for key, group in itertools.groupby(sorted(input_rows), lambda x: x[0]):
+        l = list(group)
+        guard_sleep_periods[key] = [(x[1], x[2]) for x in l]
+
+    max_very = 0
+    t_guard = None
+    t_minute = None
+    for guard, periods in guard_sleep_periods.items():
+        sleeping_minutes = [0] * 60
+        for period in periods:
+            for y in range(period[0], period[1]):
+                sleeping_minutes[y] += 1
+        minute, sleeps = max(enumerate(sleeping_minutes), key=lambda x: x[1])
+        if sleeps > max_very: # @supermitch
+            max_very = sleeps
+            t_guard = guard
+            t_minute = minute
+
+    print(f'Guard {t_guard} slept {max_very} times at minute {t_minute}')
+
+    return t_guard * t_minute
 
 
 def numify(x):
@@ -54,7 +74,7 @@ def main():
                 input_rows.append((sleepy_guard, sleep_start, sleep_end))
 
     print('Part 1: ' + str(part1(input_rows)))
-    # print('Part 2: ' + str(part2(input_rows)))
+    print('Part 2: ' + str(part2(input_rows)))
 
 
 if __name__ == '__main__':
