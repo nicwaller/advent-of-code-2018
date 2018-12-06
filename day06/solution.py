@@ -24,6 +24,14 @@ def dist_to_nearest(x, y, coords):
     return min_d, nearest_neighbour
 
 
+def dist_to_all(x, y, coords):
+    total_d = 0
+    counts = defaultdict(int)
+    for name, c in coords.items():
+        total_d += manhattan_distance(x, y, c[0], c[1])
+    return total_d
+
+
 def dump(matrix):
     with open('matrix.txt', 'w') as file_handle:
         for row in matrix:
@@ -69,7 +77,7 @@ def part1():
             infinite_ranges[key] = True
             matrix[x][y] = '  '
 
-    # TOOD: remove this debugging
+    # TODO: remove this debugging
     for name, c in coords.items():
         matrix[c[0]][c[1]] = name.lower()
 
@@ -88,7 +96,46 @@ def part1():
 
 
 def part2():
-    return ''
+    coords = dict()
+    count = 0
+    with open('puzzle_input') as file_handle:
+        for row in file_handle:
+            x, y = re.sub(r'[^0-9]', ' ', row).split()
+            coord_name = chr(math.floor(count / 26) + 65) + chr((count % 26) + 65)
+            # print(coord_name)
+            count += 1
+            coords[coord_name] = (int(x), int(y))
+    left = min([x for (x, y) in coords.values()])
+    right = max([x for (x, y) in coords.values()])
+    top = min([y for (x, y) in coords.values()])
+    bottom = max([y for (x, y) in coords.values()])
+    print(left, right, top, bottom)
+
+    matrix = [['-' for x in range(0, right + 12)] for y in range(0, bottom + 12)]
+    safe = 0
+    for x in range(left, right+1):
+        for y in range(top, bottom+1):
+            dist = dist_to_all(x, y, coords)
+            if dist < 10000:
+                safe += 1
+                matrix[x][y] = '#'
+
+    # TODO: remove this debugging
+    for name, c in coords.items():
+        matrix[c[0]][c[1]] = '@'
+
+    for x in [left, right]:
+        for y in range(top, bottom):
+            key = matrix[x][y]
+            matrix[x][y] = '|'
+    for y in [top, bottom]:
+        for x in range(left, right):
+            key = matrix[x][y]
+            matrix[x][y] = '_'
+
+    dump(matrix)
+
+    return safe
 
 
 def tests():
@@ -99,11 +146,9 @@ def tests():
 
 def main():
     tests()
-    print('Part 1: ' + str(part1()))
-    # 5273 is not the correct answer
-    # 5296 also not correct
-
-    # print('Part 2: ' + str(part2()))
+    # print('Part 1: ' + str(part1()))
+    print('Part 2: ' + str(part2()))
+    # 46462 is wrong
 
 
 if __name__ == '__main__':
