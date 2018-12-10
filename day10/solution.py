@@ -1,7 +1,10 @@
 import re
+from collections import defaultdict
+
 from PIL import Image, ImageDraw
 from itertools import islice
 from sys import maxsize
+
 
 def load(filename):
     """
@@ -11,7 +14,7 @@ def load(filename):
     :return:
     """
     with open(filename) as f:
-        for line in (line.strip() for line in f):
+        for line in f:
             x, y, dx, dy = [int(x) for x in re.sub(r'[^0-9\-]', ' ', line).split()]
             yield ((x, y), (dx, dy))
 
@@ -69,6 +72,30 @@ def frame_divergence(vectors, frame=0):
     return total_distance
 
 
+def lonely_points(vectors, frame=0):
+    """
+    Count the number of points that have no neighbours.
+
+    This is a more discriminating test and is more likely to produce a correct result,
+    but it's also quite a bit slower because it requires iterating over the entire list.
+    And for that reason, I'm out.
+
+    :param vectors:
+    :param frame:
+    :return:
+    """
+    # First, compute the positions at the current frame
+    pos = positions_at_frame(vectors, frame)
+    matrix = defaultdict(int)
+    for p in pos:
+        matrix[(p[0],   p[1])] += 1
+        matrix[(p[0]-1, p[1])] += 1
+        matrix[(p[0]+1, p[1])] += 1
+        matrix[(p[0], p[1]-1)] += 1
+        matrix[(p[0], p[1]+1)] += 1
+    return len(filter(lambda p: matrix[(p[0], p[1])] <= 1, pos))
+
+
 def find_best_frame(vectors):
     """
     Given a list of vectors (position + velocity), pick the moment when they are closest together.
@@ -106,7 +133,7 @@ def supercollider(data):
     im = Image.new('1', (width, height))
 
     draw = ImageDraw.Draw(im)
-    draw.rectangle(((0, 00), (500, 500)), fill="white")
+    draw.rectangle(((0, 00), (width, height)), fill="white")
     for (x,y) in shifted_pos:
         draw.rectangle(((x, y), (x + 1, y + 1)), fill="black")
     filename = f'frame{best_frame}.jpg'
