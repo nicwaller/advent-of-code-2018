@@ -39,21 +39,22 @@ def part1(puzzle_input: int) -> int:
 
 
 # How many recipes appear on the scoreboard to the left of the score sequence in your puzzle input?
-def part2(puzzle_input: Text) -> int:
+def part2(puzzle_input: Text, skip: int = 0) -> int:
     pattern = list([c for c in puzzle_input])
     g = generate()
-    last5 = deque(maxlen=5)
-    last5.extend(islice(g, 5))
+    [next(g) for _ in range(skip)]
+    last_n = deque(maxlen=len(pattern))
+    checkrange = range(len(pattern))
     while True:
-        last5.append(next(g))
+        last_n.append(next(g))
         # Check to see if last5 matches the pattern
         match = True
-        for i in range(5):
-            if pattern[i] != last5[i][1]:
+        for i in checkrange:
+            if pattern[i] != last_n[i][1]:
                 match = False
                 break
         if match:
-            return last5[0][0]
+            return last_n[0][0]
 
 
 def tests():
@@ -74,12 +75,10 @@ def main():
     tests()
     puzzle_input = 236021
     p1_guess = part1(puzzle_input)
-    print(p1_guess)
     assert '6297310862' == p1_guess
     print("Part 1: " + str(p1_guess))
 
     p2_guess = part2(str(puzzle_input))
-    print(p2_guess)
     assert 14623264 < p2_guess
     print("Part 2: " + str(p2_guess))
 
