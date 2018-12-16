@@ -4,6 +4,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Dict, Tuple, List, DefaultDict, Text, Set
 import networkx as nx
+from sys import maxsize
 
 elf_names = """Fyries Voidrage
 Nilarion Skymight
@@ -213,6 +214,7 @@ Hitpoints = int
 
 class Unit(object):
     place: Coordinate2D
+    start: Coordinate2D
     character_class: CharacterClass
     hitpoints: Hitpoints
     attack_power: int
@@ -220,6 +222,7 @@ class Unit(object):
     name: Text
 
     def __init__(self, place, character_class, hitpoints=200, name=""):
+        self.start = place
         self.place = place
         self.character_class = character_class
         self.hitpoints = hitpoints
@@ -242,6 +245,12 @@ class Unit(object):
         self.alive = (self.hitpoints > 0)
         if not self.alive:
             print(f'{self.character_class.name} death at {self.place}')
+
+    def reset(self, power=3):
+        self.place = self.start
+        self.hitpoints = 200
+        self.attack_power = power
+        self.alive = True
 
 
 # When multiple choices are equally valid, ties are broken in reading order: top-to-bottom, then left-to-right.
@@ -310,6 +319,13 @@ class Scenario(object):
                 print('wasted one removal')
         return G
 
+    def reset(self, elf_power=3):
+        for unit in self.units:
+            if unit.character_class == CharacterClass.ELF:
+                unit.reset(power=elf_power)
+            else:
+                unit.reset(power=3)
+
 
 def test_battle_ended():
     scenario: Scenario = Scenario()
@@ -365,9 +381,7 @@ def load(filename: Text) -> Scenario:
 # I need to convince the shortest path solver to move up before moving left
 # so we need to make it cheaper to move up than left
 def edge_weight(node1, node2, edge_detail):
-    dx = node2[0] - node1[0]
-    dy = node2[1] - node1[1]
-    return 1 + 0.01 * dy + 0.0001 * dx
+    return 1 + 0.01 * (node2[1] - node1[1]) + 0.0001 * (node2[0] - node1[0])
 
 
 def test_edge_weight():
@@ -400,6 +414,9 @@ def test_shortest_path():
     print("TEST OK: shortest path")
 
 
+def manhattan_distance(a: (int, int), b: (int, int)):
+    return abs(a[0]-b[0]) + abs(a[1]-b[1])
+
 # Actually returns paths that take us adjacent to targets
 def target_paths(movement_graph: nx.Graph, terrain: Terrain, all_units: UnitList, active_unit: Unit) -> List[Path]:
     # TODO: enumerate all targets
@@ -410,10 +427,16 @@ def target_paths(movement_graph: nx.Graph, terrain: Terrain, all_units: UnitList
     for target in filter(active_unit.can_attack, all_units):
         new_squares = adjacent_squares(target.place)
         adjacents.update(new_squares)  # TODO: verify this works correctly
+
+    shortest_so_far = maxsize
     for tile in adjacents:
         if tile.as_tuple() in movement_graph.nodes:
             try:
-                paths.append(shortest_path_to_tile(movement_graph, origin, tile))
+                if manhattan_distance(tile.as_tuple(), origin.as_tuple()) > shortest_so_far:
+                    continue
+                thispath = shortest_path_to_tile(movement_graph, origin, tile)
+                paths.append(thispath)
+                shortest_so_far = min(shortest_so_far, len(thispath.steps))
             except nx.exception.NetworkXNoPath:
                 continue
     paths.sort()
@@ -437,10 +460,15 @@ def target_key(target: Unit):
     return target.hitpoints * 100000 + target.place.y * 1000 + target.place.x
 
 
+class ElfDiedException(Exception):
+    pass
+
+
 # What is the outcome of battle?
 # outcome = full_rounds X sum(remaining hit points)
-def part1(scenario: Scenario) -> int:
-    scenario.print()
+def part1(scenario: Scenario, death_is_fatal: bool = False, verbose: bool = False) -> int:
+    if verbose:
+        scenario.print()
     completed_rounds: int = 0
     while scenario.battle_ongoing():
         endit: bool = False
@@ -476,7 +504,10 @@ def part1(scenario: Scenario) -> int:
                 target: Unit = available_targets[0]
                 target.take_damage_from(active_unit)
                 if not target.alive:
-                    scenario.print()
+                    if death_is_fatal and target.character_class == CharacterClass.ELF:
+                        raise ElfDiedException()
+                    if verbose:
+                        scenario.print()
             else:
                 # print('no targets available')
                 pass
@@ -487,13 +518,43 @@ def part1(scenario: Scenario) -> int:
         completed_rounds += 1
         if completed_rounds % 1 == 0:
             print(f'completed_rounds : {completed_rounds }')
-        if movement or True:
+        if movement and verbose:
             scenario.print()
 
     sum_hp = sum((unit.hitpoints for unit in scenario.living_units()))
     outcome = completed_rounds * sum_hp
     print(f'outcome: {outcome}')
     return outcome
+
+
+def part2(scenario: Scenario):
+    lower_guess = 15
+    upper_guess = 25
+    while upper_guess - lower_guess > 2:
+        test_value = (upper_guess - lower_guess) // 2 + lower_guess
+        print(f'Testing val={test_value} in range (low={lower_guess}, high={upper_guess})')
+        scenario.reset(elf_power=test_value)
+        try:
+            part1(scenario, death_is_fatal=True, verbose=False)
+            print(f"All elves survive at strength {test_value}")
+            guessed_too_high = True
+        except ElfDiedException as e:
+            guessed_too_high = False
+        if guessed_too_high:
+            upper_guess = test_value
+        else:
+            lower_guess = test_value
+
+    for strength in range(lower_guess, upper_guess+1):
+        scenario.reset(elf_power=strength)
+        try:
+            outcome = part1(scenario, death_is_fatal=True, verbose=False)
+            print(f"All elves survived at strength: {strength}")
+            return outcome
+        except ElfDiedException as e:
+            print("Elf died")
+            continue
+
 
 
 def test_targeting():
@@ -507,18 +568,22 @@ def tests():
     test_shortest_path()
     test_path_comparison()
     test_edge_weight()
-    # assert 27730 == part1(load('test_input'))
-    # assert 36334 == part1(load('test_36334'))
+    assert 27730 == part1(load('test_input'), death_is_fatal=True)
+    assert 36334 == part1(load('test_36334'))
     print("ALL TESTS OK")
 
 
 def main():
-    tests()
+    # tests()
     puzzle_scenario: Scenario = load('puzzle_input')
-    p1_guess = part1(puzzle_scenario)
-    assert 256608 != p1_guess  # Avoid repeat wrong answers
-    assert 218820 > p1_guess
-    print("Part 1: " + str(p1_guess))
+    # p1_guess = part1(puzzle_scenario)
+    # assert 256608 != p1_guess  # Avoid repeat wrong answers
+    # assert 218820 > p1_guess
+    # assert 213692 == p1_guess
+    # print("Part 1: " + str(p1_guess))
+
+    p2_guess = part2(puzzle_scenario)
+    print("Part 2: " + str(p2_guess))
 
 
 # TODO: sanity check against multiple characters in a single tile
