@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from enum import Enum
 from typing import Dict, Tuple, List, DefaultDict, Text, Set
-import networkx as nx
-from sys import maxsize
 
 class Opcode(object):
     code: int
@@ -114,24 +111,54 @@ def load_samples(filename):
     return samples
 
 
+def load_code(filename):
+    code = list()
+    with open(filename) as f:
+        # 4 3 2 2
+        try:
+            while True:
+                code.append(tuple([int(x) for x in next(f).strip().split(' ')]))
+        except StopIteration:
+            pass
+    return code
+
 def part1(samples):
+    # Can I use a bloom filter for this?
+    possibilities: Dict[int, Set[Text]] = defaultdict(lambda: set([op.name for op in opcodes]))
     # register_bank: List[int] = list([0]*4)
     matching_samples = 0
     for s in samples:
         matches = 0
+        sample_op = s[1][0]
         for op in opcodes:
             register_bank = list(s[0])
             op.execute(s[1], register_bank)
             # print(register_bank, s[2])
             if register_bank == s[2]:
                 matches += 1
+            else:
+                possibilities[sample_op].discard(op.name)
         if matches >= 3:
             matching_samples += 1
 
+    assignments: Dict[int, Opcode] = dict()
+    while len(assignments) < 16:
+        for pcode, solution in filter(lambda item: len(item[1]) == 1, possibilities.items()):
+            op = solution.pop()
+            assignments[pcode] = Opcode(op)
+            for i in range(0, 16):
+                possibilities[i].discard(op)
+            print(pcode)
+
     print(f'samples: {len(samples)}')
-    return matching_samples
+    return matching_samples, assignments
 
-
+# What value is contained in register 0 after executing the test program?
+def part2(instruction_table, program):
+    registers: List[int] = list([0] * 4)
+    for instruction in program:
+        instruction_table[instruction[0]].execute(instruction, registers)
+    return registers[0]
 
 def tests():
     print("ALL TESTS OK")
@@ -140,9 +167,15 @@ def tests():
 def main():
     tests()
     puzzle_samples = load_samples('puzzle_input_1')
-    p1_guess = part1(puzzle_samples)
+    p1_guess, instruction_table = part1(puzzle_samples)
     assert 583 > p1_guess
+    assert 580 == p1_guess
     print("Part 1: " + str(p1_guess))
+
+    puzzle_code = load_code('puzzle_input_2')
+    p2_guess = part2(instruction_table, puzzle_code)
+    assert 537 == p2_guess
+    print("Part 2: " + str(p2_guess))
 
 
 if __name__ == '__main__':
