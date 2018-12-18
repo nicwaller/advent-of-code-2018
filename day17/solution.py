@@ -28,7 +28,7 @@ class WaterMap(object):
         # approximate bounds are 2000 x 2000
         x_min = maxsize
         x_max = -maxsize
-        y_min = 0
+        y_min = maxsize
         y_max = -maxsize
         with open(filename) as f:
             for row in f:
@@ -45,19 +45,20 @@ class WaterMap(object):
                 for x in range(x1, x2 + 1):
                     for y in range(y1, y2 + 1):
                         self.terrain[(x, y)] = '#'
-        self.bounds: Bounds = (
-        (x_min, x_max + 1), (y_min, y_max + 1))  # bounds are right-exclusive, for easy use with range()
+        # expand the x bounds by 1 to allow for flooding over the edge FIXME: not sure if that's right
+        # bounds are right-exclusive, for easy use with range()
+        self.bounds: Bounds = ((x_min-1, x_max + 2), (y_min, y_max + 1))
 
     def print(self, headers=True):
         x_bounds = self.bounds[0]
         y_bounds = self.bounds[1]
-        for y in range(*y_bounds):
+        for y in range(0, y_bounds[1]):  # print the spring even though it's technically out of bounds
             row = ""
             if headers:
-                row += "%2d" % y + " "
+                row += "%4d" % y + " "
             for x in range(*x_bounds):
                 if (x, y) == spring:
-                    row += '@'
+                    row += '+'
                 # elif (x, y) in water:
                 #     row += '~'
                 # elif (x, y) in flowing:
@@ -73,7 +74,7 @@ class WaterMap(object):
 
         :param source:
         :param seen: set of places this recursion has visited (so we can avoid re-recursing)
-        :return: true if new water did flow through source
+        :return: true if new water did flow through source TODO: count new flow spaces
         """
         # print(source)
         # sleep(0.05)
@@ -138,11 +139,16 @@ class WaterMap(object):
             for match_result in flowing_water_matcher.finditer(row):
                 for capture_group_number in range(1, match_result.lastindex+1):
                     span = match_result.span(capture_group_number)
-                    found_pooled_water = True
-                    # TODO: check the support below this span to confirm pooling
-                    for fill_x in range(*span):
-                        self.terrain[(x + fill_x, y)] = '~'
-                    # print(span)
+                    row_below = ''.join([self.terrain[(x, y+1)] for x in range(*self.bounds[0])])
+                    support_span = row_below[span[0]:span[1]]
+                    if re.match('^[#~]+$', support_span):
+                        found_pooled_water = True
+                        # TODO: check the support below this span to confirm pooling
+                        for fill_x in range(*span):
+                            self.terrain[(x + fill_x, y)] = '~'
+                        # print(span)
+                    # else:
+                    #     print('rejected a bad fill span')
         return found_pooled_water
 
 
@@ -153,11 +159,13 @@ def part1(water_map):
         water_map.flow_from(spring)
         if not water_map.mark_pooled_water():
             break
-    water_map.print()
+    water_map.print(headers=False)
 
     # Be careful that everything counted is in-bounds
-    # Subtract 1 because we don't count the spring as wet
-    wetted_squares = sum((1 for _ in filter(lambda x: x in '|~', water_map.terrain.values()))) - 1
+    # Ignore tiles with y smaller than the smallest y in your scan data or larger than the largest one.
+    # Any x coordinate is valid.
+    countable_squares = (kv[1] for kv in water_map.terrain.items() if kv[0][1] >= water_map.bounds[1][0])
+    wetted_squares = sum((1 for _ in filter(lambda x: x in '|~', countable_squares)))
     print(f'---[ {wetted_squares} wet squares]---')
     return wetted_squares
 
@@ -179,6 +187,8 @@ def main():
     p1 = part1(water)
     assert 39460 > p1
     assert 39454 > p1
+    assert 38453 > p1
+    assert 38451 == p1
     print(f"Part 1: {p1}")
 
     return
