@@ -154,13 +154,7 @@ class WaterMap(object):
 
 # How many tiles can the water reach within the range of y values in your scan?
 # (both stationary and flowing)
-def part1(water_map):
-    while True:
-        water_map.flow_from(spring)
-        if not water_map.mark_pooled_water():
-            break
-    water_map.print(headers=False)
-
+def part1(water_map: WaterMap):
     # Be careful that everything counted is in-bounds
     # Ignore tiles with y smaller than the smallest y in your scan data or larger than the largest one.
     # Any x coordinate is valid.
@@ -170,9 +164,22 @@ def part1(water_map):
     return wetted_squares
 
 
+# How many water tiles are left after the water spring stops producing water and all remaining water not at rest has drained?
+def part2(water_map: WaterMap):
+    countable_squares = (kv[1] for kv in water_map.terrain.items() if kv[0][1] >= water_map.bounds[1][0])
+    wetted_squares = sum((1 for _ in filter(lambda x: x == '~', countable_squares)))
+    print(f'---[ {wetted_squares} water at rest ]---')
+    return wetted_squares
+
+
 def tests():
     water = WaterMap()
     water.load('test_input')
+    while True:
+        water.flow_from(spring)
+        if not water.mark_pooled_water():
+            break
+    water.print(headers=False)
     assert 57 == part1(water)
     print("ALL TESTS OK")
 
@@ -184,6 +191,12 @@ def main():
     setrecursionlimit(6000)
     water = WaterMap()
     water.load('puzzle_input')
+    while True:
+        water.flow_from(spring)
+        if not water.mark_pooled_water():
+            break
+    water.print(headers=False)
+
     p1 = part1(water)
     assert 39460 > p1
     assert 39454 > p1
@@ -191,7 +204,9 @@ def main():
     assert 38451 == p1
     print(f"Part 1: {p1}")
 
-    return
+    p2 = part2(water)
+    assert 28142 == p2
+    print(f"Part 2: {p2}")
 
 
 if __name__ == '__main__':
